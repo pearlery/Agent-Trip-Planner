@@ -20,7 +20,7 @@ def _call_ollama(model: str, system: str, user: str) -> str:
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
-        options={"temperature": 0.1, "num_predict": 1024},
+        options={"temperature": 0.1, "num_predict": 4096},
     )
     return response["message"]["content"]
 
@@ -37,7 +37,7 @@ def _openai_compatible(url: str, api_key: str, model: str, system: str, user: st
                 {"role": "user", "content": user},
             ],
             "temperature": 0.1,
-            "max_tokens": 1024,
+            "max_tokens": 4096,
         },
         timeout=60,
     )
@@ -162,3 +162,53 @@ class TravelAgent:
             )
 
         return "Reached maximum iterations without a final answer."
+
+    def run_stream(self, user_query: str):
+        """Generator version for Streamlit — yields step dicts instead of printing."""
+        history = ""
+        for iteration in range(1, MAX_ITERATIONS + 1):
+            system_prompt, user_content = build_messages(user_query, history)
+            try:
+                llm_text = self._call_llm(system_prompt, user_content)
+            except Exception as e:
+                yield {"type": "error", "content": str(e)}
+                return
+
+            parsed = self._parse(llm_text)
+
+            if parsed["thought"]:
+                yield {"type": "thought", "content": parsed["thought"], "iteration": iteration}
+
+            if parsed["final_answer"]:
+                yield {"type": "final", "content": parsed["final_answer"]}
+                return
+
+            action = parsed.get("action")
+            action_input = parsed.get("action_input") or {}
+
+            if not action:
+                yield {"type": "error", "content": "ไม่สามารถ parse action ได้"}
+                return
+
+            yield {"type": "action", "action": action, "input": action_input}
+
+            if action not in self.tools:
+                observation = f"ไม่พบ tool '{action}' มีแค่: {', '.join(self.tools)}"
+            else:
+                try:
+                    observation = str(self.tools[action](**action_input))
+                except TypeError as e:
+                    observation = f"Tool arguments ผิด: {e}"
+                except Exception as e:
+                    observation = f"Tool error: {e}"
+
+            yield {"type": "observation", "content": observation}
+
+            history += (
+                f"Thought: {parsed['thought'] or ''}\n"
+                f"Action: {action}\n"
+                f"Action Input: {json.dumps(action_input)}\n"
+                f"Observation: {observation}\n\n"
+            )
+
+        yield {"type": "error", "content": "ครบ max iterations แล้วยังไม่ได้คำตอบ"}

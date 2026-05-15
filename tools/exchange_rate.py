@@ -2,27 +2,30 @@ import requests
 
 
 def get_exchange_rate(from_currency: str, to_currency: str, amount: float = 1.0) -> str:
-    """Fetch live currency exchange rates via the free Frankfurter API (no API key needed)."""
+    """Get live currency exchange rate. รองรับ THB โดยตรง (open.er-api.com, ไม่ต้อง API key)."""
     try:
-        url = f"https://api.frankfurter.app/latest?from={from_currency.upper()}&to={to_currency.upper()}"
-        resp = requests.get(url, timeout=10)
+        resp = requests.get(
+            f"https://open.er-api.com/v6/latest/{from_currency.upper()}",
+            timeout=10,
+        )
         resp.raise_for_status()
         data = resp.json()
 
+        if data.get("result") != "success":
+            return f"ไม่สามารถดึงอัตราแลกเปลี่ยน {from_currency} ได้"
+
         rate = data.get("rates", {}).get(to_currency.upper())
         if rate is None:
-            return (
-                f"Currency '{to_currency}' not found. "
-                "Note: THB (Thai Baht) is not in Frankfurter's base set — use USD or EUR as an intermediate."
-            )
+            return f"ไม่พบสกุลเงิน '{to_currency}'"
 
         converted = amount * rate
+        updated = data.get("time_last_update_utc", "")[:16]
         return (
-            f"Exchange Rate ({data.get('date', 'N/A')}):\n"
-            f"  1 {from_currency.upper()} = {rate:.4f} {to_currency.upper()}\n"
-            f"  {amount} {from_currency.upper()} = {converted:,.2f} {to_currency.upper()}"
+            f"อัตราแลกเปลี่ยน (อัปเดต: {updated}):\n"
+            f"  1 {from_currency.upper()} = {rate:,.4f} {to_currency.upper()}\n"
+            f"  {amount:,.2f} {from_currency.upper()} = {converted:,.2f} {to_currency.upper()}"
         )
     except requests.RequestException as e:
-        return f"Network error fetching exchange rate: {e}"
+        return f"Network error: {e}"
     except Exception as e:
         return f"Error: {e}"

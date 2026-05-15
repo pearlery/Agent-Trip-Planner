@@ -10,7 +10,9 @@ from rag.loader import load_documents_from_dir
 from rag.vector_store import TravelVectorStore, CHROMA_DATA_PATH
 from tools.semantic_search import init_search_tool, semantic_search
 from tools.exchange_rate import get_exchange_rate
-from tools.hotel_search import search_hotels
+# from tools.hotel_search import search_hotels   # requires AMADEUS_API_KEY
+# from tools.flight_search import search_flights  # requires AMADEUS_API_KEY
+from tools.weather import get_weather
 from agent import TravelAgent
 
 DATA_DIR = "./data"
@@ -87,7 +89,9 @@ def main():
     agent = TravelAgent(model_name=model_name, backend=BACKEND)
     agent.register_tool("semantic_search", semantic_search)
     agent.register_tool("get_exchange_rate", get_exchange_rate)
-    agent.register_tool("search_hotels", search_hotels)
+    # agent.register_tool("search_hotels", search_hotels)   # requires AMADEUS_API_KEY
+    # agent.register_tool("search_flights", search_flights)  # requires AMADEUS_API_KEY
+    agent.register_tool("get_weather", get_weather)
 
     log_step("Ready", "Agent ready! Type your travel query in Thai or English.", "bold green")
     console.print()
