@@ -19,8 +19,17 @@ def semantic_search(query: str, n_results: int = 3) -> str:
     if not docs:
         return "No relevant information found."
 
-    parts = [f"Found {len(docs)} relevant passages:\n"]
+    parts = [f"Found {len(docs)} relevant results:\n"]
     for i, (doc, score, meta) in enumerate(zip(docs, scores, metas), 1):
-        src = meta.get("source", "unknown")
-        parts.append(f"[{i}] relevance={score:.4f}  source={src}\n{doc}\n")
+        # Support both CSV tour metadata and PDF/TXT source metadata
+        if meta.get("program_tour"):
+            meta_str = (
+                f"tour={meta.get('program_tour', '')}  "
+                f"price={meta.get('price', '')}  "
+                f"region={meta.get('region', '')}  "
+                f"url={meta.get('url', '')}"
+            )
+        else:
+            meta_str = f"source={meta.get('source', 'unknown')}"
+        parts.append(f"[{i}] relevance={score:.4f}  {meta_str}\n{doc}\n")
     return "\n".join(parts)

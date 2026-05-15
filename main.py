@@ -7,14 +7,15 @@ load_dotenv()
 
 from logger_utils import console, log_step
 from rag.loader import load_documents_from_dir
-from rag.vector_store import TravelVectorStore
+from rag.vector_store import TravelVectorStore, CHROMA_DATA_PATH
 from tools.semantic_search import init_search_tool, semantic_search
 from tools.exchange_rate import get_exchange_rate
 from tools.hotel_search import search_hotels
 from agent import TravelAgent
 
 DATA_DIR = "./data"
-CHROMA_DIR = "./chroma_db"
+CSV_PATH = "data/tours_merged_cleaned2.csv"
+CHROMA_DIR = CHROMA_DATA_PATH
 
 # Backend: "typhoon" (default) | "ollama" | "groq"
 BACKEND = os.getenv("LLM_BACKEND", "typhoon")
@@ -31,20 +32,28 @@ GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 def setup_vector_store() -> TravelVectorStore:
     vs = TravelVectorStore(persist_dir=CHROMA_DIR)
-    if vs.count() == 0:
-        log_step("Setup", "Vector store empty — loading documents...", "yellow")
-        if not os.path.exists(DATA_DIR):
-            os.makedirs(DATA_DIR)
-            log_step("Warning", f"No data/ folder found. Created empty one — add PDF/TXT files then restart.", "red")
-            return vs
+    if vs.count() > 0:
+        log_step("Setup", f"ChromaDB ready: {vs.count()} records loaded", "green")
+        return vs
+
+    log_step("Setup", "Vector store empty — indexing data...", "yellow")
+
+    # Priority 1: CSV tour data
+    if os.path.exists(CSV_PATH):
+        from rag.vector_store import init_vector_db
+        init_vector_db(csv_path=CSV_PATH, persist_dir=CHROMA_DIR)
+        log_step("Setup", f"Indexed CSV: {vs.count()} records", "green")
+        return vs
+
+    # Priority 2: PDF/TXT files in data/
+    if os.path.exists(DATA_DIR):
         chunks, metas = load_documents_from_dir(DATA_DIR)
         if chunks:
             vs.add_documents(chunks, metas)
-            log_step("Setup", f"Indexed {len(chunks)} chunks into ChromaDB", "green")
-        else:
-            log_step("Warning", "No documents in data/ — add PDF or TXT files.", "red")
-    else:
-        log_step("Setup", f"ChromaDB ready: {vs.count()} chunks loaded", "green")
+            log_step("Setup", f"Indexed {len(chunks)} chunks from data/", "green")
+            return vs
+
+    log_step("Warning", f"No data found. Add '{CSV_PATH}' or PDF/TXT files in data/", "red")
     return vs
 
 

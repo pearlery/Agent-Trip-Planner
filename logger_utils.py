@@ -1,6 +1,12 @@
+import sys
+import io
 import datetime
 from rich.console import Console
 from rich.panel import Panel
+
+# Force UTF-8 on Windows so Thai characters render correctly
+if hasattr(sys.stdout, "buffer"):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 console = Console()
 
@@ -34,7 +40,15 @@ def log_final_answer(answer: str):
 def log_retrieved_docs(docs: list, scores: list, metadatas: list = None):
     console.print("\n[bold blue]--- Retrieved Documents ---[/bold blue]")
     for i, (doc, score) in enumerate(zip(docs, scores), 1):
-        source = metadatas[i - 1].get("source", "unknown") if metadatas else "unknown"
-        console.print(f"  [dim][{i}][/dim] Score: [green]{score:.4f}[/green]  Source: [blue]{source}[/blue]")
+        meta = metadatas[i - 1] if metadatas else {}
+        if meta.get("program_tour"):
+            meta_line = (
+                f"[magenta]{meta.get('program_tour', '')}[/magenta]  "
+                f"ราคา:[yellow]{meta.get('price', '-')}[/yellow]  "
+                f"region:[cyan]{meta.get('region', '-')}[/cyan]"
+            )
+        else:
+            meta_line = f"source:[blue]{meta.get('source', 'unknown')}[/blue]"
+        console.print(f"  [dim][{i}][/dim] Score: [green]{score:.4f}[/green]  {meta_line}")
         console.print(f"      {doc[:200].strip()}...")
     console.print()
